@@ -24,7 +24,7 @@ jnz error
 
 jmp 0:0x1002
 
-xchg bx, bx; boxhs magic breakpiont
+xchg bx, bx; bochs magic breakpiont
 
 ; block
 jmp $
