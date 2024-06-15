@@ -14,19 +14,15 @@ mov sp, 0x7c00
 mov si, booting
 call print
 
-xchg bx, bx; boxhs magic breakpiont
-
 mov edi, 0x1000; the target memory to store the data read from disk
-mov ecx, 0; the start sector
-mov bl, 1; number of sectors
+mov ecx, 2; the start sector
+mov bl, 4; number of sectors
 call read_disk
 
-xchg bx, bx; boxhs magic breakpiont
+cmp word [0x1000], 0x55aa
+jnz error
 
-mov edi, 0x1000; the target memory of data to write to disk
-mov ecx, 2; the start sector
-mov bl, 1; number of sectors
-call write_disk
+jmp 0:0x1002
 
 xchg bx, bx; boxhs magic breakpiont
 
@@ -107,82 +103,6 @@ read_disk:
             loop .readw
         ret
 
-
-write_disk:
-
-    ; set the number of sectors
-    mov dx, 0x1f2
-    mov al, bl
-    out dx, al
-
-    inc dx; 0x1f3
-    mov al, cl; first 8 bits of start sector
-    out dx, al
-
-    inc dx; 0x1f4
-    shr ecx, 8
-    mov al, cl; second 8 bits of start sector
-    out dx, al
-
-    inc dx; 0x1f5
-    shr ecx, 8
-    mov al, cl; third 8 bits of start sector
-    out dx, al
-
-    inc dx; 0x1f6
-    shr ecx, 8
-    and cl, 0b1111; set the high 4 bits to be 0
-
-    mov al, 0b1110_0000
-    ;         7654 4321
-    ; 4: 0, master disk
-    ; 5/7: 1, fixed 1
-    ; 6: 1, LBA mode
-    or al, cl
-    out dx, al; master disk - LBA mode
-
-    inc dx; 0x1f7
-    mov al, 0x30; write disk
-    out dx, al
-
-    xor ecx, ecx; use xor to clear ecx, = mov ecx, 0
-    mov cl, bl; get the number of sector read
-
-    .write:
-        push cx; save cx
-        call .writes; write a sector
-        call .waits; wait for the disk buzy finishing
-        pop cx; restore cx
-        loop .write
-
-    ret
-
-    .waits:
-        mov dx, 0x1f7
-        .check:
-            in al, dx
-            jmp $+2; = nop, jump to next line, but spend more time cycle
-            jmp $+2; delay
-            jmp $+2
-            and al, 0b1000_0000
-            cmp al, 0b0000_0000
-            jnz .check
-        ret
-
-    .writes:
-        mov dx, 0x1f0
-        mov cx, 256; one sector, 256 bytes
-        .writew:
-            mov ax, [edi]
-            out dx, ax
-            jmp $+2; delay
-            jmp $+2
-            jmp $+2
-            add edi, 2
-            loop .writew
-        ret
-
-
 print:
     mov ah, 0x0e
 .next:
@@ -197,6 +117,13 @@ print:
 
 booting:
     db "Booting Yonix...", 10, 13, 0; \n\r
+
+error:
+    mov si, .msg
+    call print
+    hlt; let CPU stops
+    jmp $
+    .msg db "Booting Error!!!", 10, 13, 0
     
 
 times 510 - ($ - $$) db 0
